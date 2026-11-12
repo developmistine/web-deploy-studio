@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+coverage/
+data/
+.env
+.env.*
+!.env.example
+!.env.compose.example
+src/generated/
+*.tsbuildinfo
+next-env.d.ts

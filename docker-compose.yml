@@ -1,0 +1,166 @@
+# Deploy Studio — local development stack (NOT a production deployment; see docs/security/release-gates.md).
+#
+# Trust boundaries are expressed as networks:
+#   edge          proxy ↔ outside world (only the proxy publishes a port)
+#   app           proxy ↔ web (management app + forward-auth gate)     [internal]
+#   db            web/worker ↔ MySQL                                     [internal]
+#   egress        web → outbound (none required today; reserved for a future SSO IdP — restrict with host firewall)
+#   ds-sites      proxy/worker ↔ site & preview containers               [internal: no egress]
+#   docker-api    worker ↔ docker-socket-proxy                           [internal]
+# The Docker socket is mounted ONLY into docker-socket-proxy (read-only), never into web.
+name: deploy-studio
+
+x-hardening: &hardening
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  restart: unless-stopped
+
+services:
+  mysql:
+    image: mysql:8.4
+    <<: *hardening
+    cap_drop: []          # mysqld needs default capabilities to start (setuid to mysql user)
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env.compose}
+      MYSQL_DATABASE: deploy_studio
+      DS_APP_PASSWORD: ${DS_APP_PASSWORD:?}
+      DS_MIGRATE_PASSWORD: ${DS_MIGRATE_PASSWORD:?}
+    # Lets the non-SUPER migration account create the append-only audit triggers with binlog enabled.
+    command: ["--log-bin-trust-function-creators=1"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./infra/mysql/grants.sh:/docker-entrypoint-initdb.d/10-grants.sh:ro
+    networks: [db]
+    # Loopback only, for local tooling (Prisma Studio, tests). Never published in production.
+    ports: ["127.0.0.1:3308:3306"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      retries: 30
+
+  migrate:
+    build: { context: ., dockerfile: docker/web.Dockerfile, target: migrator }
+    <<: *hardening
+    restart: "no"
+    environment:
+      # Migration account (DDL). The runtime account cannot alter schema.
+      DATABASE_URL: mysql://ds_migrate:${DS_MIGRATE_PASSWORD:?}@mysql:3306/deploy_studio?allowPublicKeyRetrieval=true
+      SEED_DEPARTMENTS: ${SEED_DEPARTMENTS:-}
+    command: ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed.ts"]
+    networks: [db]
+    depends_on: { mysql: { condition: service_healthy } }
+
+  web:
+    build: { context: ., dockerfile: docker/web.Dockerfile, target: runtime }
+    <<: *hardening
+    read_only: true
+    tmpfs: ["/tmp:size=128m", "/app/.next/cache:size=64m,uid=1000"]
+    user: "1000:1000"
+    env_file: [.env.compose]
+    environment:
+      DATABASE_URL: mysql://ds_app:${DS_APP_PASSWORD:?}@mysql:3306/deploy_studio?allowPublicKeyRetrieval=true
+      STORAGE_ROOT: /data/storage
+      UPLOAD_TMP_DIR: /tmp
+    volumes:
+      - artifacts:/data/storage          # private artifact storage (not web-served)
+    networks: [app, db, egress]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    deploy: { resources: { limits: { cpus: "1.0", memory: 1g } } }
+
+  worker:
+    build: { context: ., dockerfile: docker/worker.Dockerfile }
+    <<: *hardening
+    read_only: true
+    tmpfs: ["/tmp:size=1g"]
+    user: "1000:1000"
+    env_file: [.env.compose]
+    environment:
+      DATABASE_URL: mysql://ds_app:${DS_APP_PASSWORD:?}@mysql:3306/deploy_studio?allowPublicKeyRetrieval=true
+      STORAGE_ROOT: /data/storage
+      WORK_DIR: /tmp
+      ROUTES_DIR: /data/routes
+      PROXY_INTERNAL_URL: http://proxy:80
+      DOCKER_HOST: tcp://docker-socket-proxy:2375   # restricted Docker API, no raw socket
+      DOCKER_CONFIG: /tmp/.docker                   # CLI state on tmpfs (root filesystem is read-only)
+      SITES_NETWORK: ds-sites
+    volumes:
+      - artifacts:/data/storage
+      - routes:/data/routes
+    networks: [db, ds-sites, docker-api]
+    depends_on: { migrate: { condition: service_completed_successfully }, docker-socket-proxy: { condition: service_started } }
+    deploy: { resources: { limits: { cpus: "2.0", memory: 2g } } }
+
+  docker-socket-proxy:
+    # Filters the Docker API: only what the worker needs (build, images, containers, network read).
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      POST: 1
+      BUILD: 1
+      IMAGES: 1
+      CONTAINERS: 1
+      NETWORKS: 1
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      EXEC: 0
+      VOLUMES: 0
+      SWARM: 0
+      SERVICES: 0
+      SECRETS: 0
+      CONFIGS: 0
+      SYSTEM: 0
+      AUTH: 0
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"]
+    networks: [docker-api]
+
+  proxy:
+    image: traefik:v3.5
+    <<: *hardening
+    cap_add: ["NET_BIND_SERVICE"]
+    read_only: true
+    command: ["--configFile=/etc/traefik/traefik.yml"]
+    env_file: [.env.compose]
+    volumes:
+      - ./infra/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      # Watched directory (Traefik's watcher is not recursive): worker-managed routes + the infra config
+      # (gateway middleware, studio router) that the worker installs from infra/traefik/dynamic/00-infra.yml.
+      - routes:/etc/traefik/dynamic:ro
+    ports: ["${DS_HTTP_PORT:-8080}:80"]
+    networks: [edge, app, ds-sites]
+
+  # Infra-only admin CLI (not a service; nothing listens). Example:
+  #   docker compose --env-file .env.compose --profile tools run --rm admin create-user --email first.admin@company.com --name "First Admin" --role ADMIN --operator <you>
+  admin:
+    build: { context: ., dockerfile: docker/web.Dockerfile, target: tools }
+    profiles: ["tools"]
+    <<: *hardening
+    restart: "no"
+    read_only: true
+    tmpfs: ["/tmp:size=64m"]
+    user: "1000:1000"
+    env_file: [.env.compose]
+    environment:
+      DATABASE_URL: mysql://ds_app:${DS_APP_PASSWORD:?}@mysql:3306/deploy_studio?allowPublicKeyRetrieval=true
+    networks: [db]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["security"]
+    restart: unless-stopped
+    networks: [ds-scan]
+
+networks:
+  edge: {}
+  app: { internal: true }
+  db: { internal: true }
+  egress: {}
+  docker-api: { internal: true }
+  ds-sites: { name: ds-sites, internal: true }
+  ds-scan: { internal: true }
+
+volumes:
+  mysql-data: {}
+  artifacts: {}
+  routes: {}

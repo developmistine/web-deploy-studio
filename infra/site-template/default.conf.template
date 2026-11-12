@@ -1,0 +1,41 @@
+server_tokens off;
+
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+    absolute_redirect off;
+    autoindex off;
+
+    # Private content: never stored by shared caches (authorization happens at the gateway per request).
+    add_header Cache-Control "private, no-store" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), hid=(), clipboard-read=()" always;
+    # Uploaded JS is untrusted: restrict where it can send data. Only Deploy Studio may frame this origin.
+    add_header Content-Security-Policy "__SITE_CSP__; frame-ancestors 'self' __FRAME_ANCESTORS__" always;
+
+    # Hosted sites may not install service workers (persistence / interception risk).
+    if ($http_service_worker) {
+        return 403;
+    }
+
+    location = /__ds_health {
+        access_log off;
+        default_type text/plain;
+        add_header Cache-Control "no-store" always;
+        return 200 "ok __DEPLOYMENT_ID__\n";
+    }
+
+    location ~ /\.(?!well-known/) {
+        deny all;
+    }
+
+    location / {
+        limit_except GET HEAD { deny all; }   # read-only hosting
+        try_files $uri $uri/ =404;
+    }
+}

@@ -1,0 +1,19 @@
+# Never send host artifacts or secrets into image build contexts.
+node_modules
+.next
+coverage
+data
+src/generated
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+!.env.compose.example
+.git
+.agents
+docs
+tests
+*.html
+
+# Brand source files (copied/optimized into public/brand)
+assest

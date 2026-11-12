@@ -1,0 +1,372 @@
+// Deploy Studio schema. MySQL 8. Metadata only — files live in private storage (STORAGE_ROOT).
+// Rules: one website per department (departments ↔ websites 1:1), immutable deployment revisions,
+// websites.active_deployment_id is the only production pointer, nothing is ever deleted by the app.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum DeploymentStatus {
+  DRAFT
+  UPLOADED
+  VALIDATING
+  BUILDING
+  PREVIEW_READY
+  DEPLOYING
+  LIVE
+  FAILED
+  ROLLED_BACK
+}
+
+enum JobType {
+  BUILD
+  PROMOTE
+  ROLLBACK
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// Departments are dynamic (not hard-coded). `code` is the normalized, hostname-safe unique key;
+/// `name` preserves the human-readable label. Creating a department never grants membership.
+model Department {
+  id        String   @id @default(uuid(7)) @db.Char(36)
+  code      String   @unique @db.VarChar(32)
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  users     User[]
+  website   Website?
+  auditLogs AuditLog[]
+
+  @@map("departments")
+}
+
+model User {
+  id                       String     @id @default(uuid(7)) @db.Char(36)
+  /// Corporate email as entered by the admin (display). Login uses emailNormalized.
+  email                    String     @db.VarChar(320)
+  /// NFKC + trim + lower-case. Not unique on its own: revoked accounts keep their history.
+  emailNormalized          String     @map("email_normalized") @db.VarChar(320)
+  /// = emailNormalized while the account is not REVOKED, otherwise NULL → one active account per email.
+  activeEmail              String?    @unique @map("active_email") @db.VarChar(320)
+  displayName              String     @map("display_name") @db.VarChar(200)
+  /// Argon2id PHC string. NULL until the user completes the one-time setup link. Never returned by any API.
+  passwordHash             String?    @map("password_hash") @db.VarChar(255)
+  status                   UserStatus @default(INVITED)
+  mustChangePassword       Boolean    @default(false) @map("must_change_password")
+  passwordChangedAt        DateTime?  @map("password_changed_at")
+  /// Set by "forgot password" (no email is sent); shown to admins, cleared when a reset link is issued/used.
+  passwordResetRequestedAt DateTime?  @map("password_reset_requested_at")
+  role                     Role
+  /// Required for USER; optional for ADMIN. Assigned only through admin enrollment — never from the client.
+  departmentId             String?    @map("department_id") @db.Char(36)
+  disabledAt               DateTime?  @map("disabled_at")
+  revokedAt                DateTime?  @map("revoked_at")
+  lastLoginAt              DateTime?  @map("last_login_at")
+  createdAt                DateTime   @default(now()) @map("created_at")
+  updatedAt                DateTime   @updatedAt @map("updated_at")
+
+  department          Department?      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  sessions            Session[]
+  enrollment          Enrollment?      @relation("EnrollmentUser")
+  createdEnrollments  Enrollment[]     @relation("EnrollmentCreator")
+  revokedEnrollments  Enrollment[]     @relation("EnrollmentRevoker")
+  passwordLinks       PasswordLink[]   @relation("PasswordLinkUser")
+  issuedPasswordLinks PasswordLink[]   @relation("PasswordLinkIssuer")
+  uploads             Deployment[]     @relation("DeploymentUploader")
+  createdWebsites     Website[]        @relation("WebsiteCreator")
+  requestedJobs       DeploymentJob[]  @relation("JobRequester")
+  auditLogs           AuditLog[]
+  idempotencyKeys     IdempotencyKey[]
+
+  @@index([emailNormalized])
+  @@index([departmentId])
+  @@index([status])
+  @@map("users")
+}
+
+enum UserStatus {
+  /// Enrolled; password not set yet (one-time SETUP link outstanding).
+  INVITED
+  ACTIVE
+  DISABLED
+  /// Soft-deleted enrollment ("Remove"): cannot sign in, email released, history preserved.
+  REVOKED
+}
+
+/// Administrative enrollment record (who enrolled/revoked the account and when). 1:1 with User.
+model Enrollment {
+  id              String           @id @default(uuid(7)) @db.Char(36)
+  userId          String           @unique @map("user_id") @db.Char(36)
+  /// NULL when bootstrapped by the infra-only admin CLI.
+  createdById     String?          @map("created_by_user_id") @db.Char(36)
+  status          EnrollmentStatus @default(ACTIVE)
+  activationState ActivationState  @default(PENDING_SETUP) @map("activation_state")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  revokedAt       DateTime?        @map("revoked_at")
+  revokedById     String?          @map("revoked_by_user_id") @db.Char(36)
+
+  user      User  @relation("EnrollmentUser", fields: [userId], references: [id], onDelete: Restrict)
+  createdBy User? @relation("EnrollmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  revokedBy User? @relation("EnrollmentRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@map("enrollments")
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum ActivationState {
+  PENDING_SETUP
+  ACTIVATED
+}
+
+/// One-time password SETUP/RESET links. Only the SHA-256 of the token is stored; single use; expiring.
+model PasswordLink {
+  /// SHA-256 of the 256-bit token handed to the user.
+  id          String              @id @db.Char(64)
+  userId      String              @map("user_id") @db.Char(36)
+  purpose     PasswordLinkPurpose
+  /// Admin who issued it (NULL = admin CLI).
+  createdById String?             @map("created_by_user_id") @db.Char(36)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  expiresAt   DateTime            @map("expires_at")
+  usedAt      DateTime?           @map("used_at")
+
+  user      User  @relation("PasswordLinkUser", fields: [userId], references: [id], onDelete: Restrict)
+  createdBy User? @relation("PasswordLinkIssuer", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_links")
+}
+
+enum PasswordLinkPurpose {
+  SETUP
+  RESET
+}
+
+model Website {
+  id                 String    @id @default(uuid(7)) @db.Char(36)
+  /// UNIQUE: hard business rule — at most one website per department.
+  departmentId       String    @unique @map("department_id") @db.Char(36)
+  siteName           String    @map("site_name") @db.VarChar(48)
+  hostname           String    @unique @db.VarChar(253)
+  /// The production pointer. Only the worker's fenced promotion transaction changes it.
+  activeDeploymentId String?   @unique @map("active_deployment_id") @db.Char(36)
+  /// Monotonic revision counter, incremented under a row lock.
+  nextVersion        Int       @default(1) @map("next_version")
+  /// Incident response: a suspended website is not served and cannot be changed (set via admin CLI only).
+  suspendedAt        DateTime? @map("suspended_at")
+  suspendedReason    String?   @map("suspended_reason") @db.VarChar(255)
+  createdByUserId    String    @map("created_by_user_id") @db.Char(36)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  department       Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  activeDeployment Deployment?     @relation("ActiveDeployment", fields: [activeDeploymentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy        User            @relation("WebsiteCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  deployments      Deployment[]    @relation("WebsiteDeployments")
+  jobs             DeploymentJob[]
+  auditLogs        AuditLog[]
+
+  @@map("websites")
+}
+
+model Deployment {
+  id                String           @id @default(uuid(7)) @db.Char(36)
+  websiteId         String           @map("website_id") @db.Char(36)
+  version           Int
+  uploadedByUserId  String           @map("uploaded_by_user_id") @db.Char(36)
+  /// Private storage key of the uploaded (normalized) ZIP. Write-once.
+  sourceArtifactKey String?          @map("source_artifact_key") @db.VarChar(512)
+  sourceSha256      String?          @map("source_sha256") @db.Char(64)
+  sourceSizeBytes   Int?             @map("source_size_bytes")
+  originalFilename  String           @map("original_filename") @db.VarChar(255)
+  fileCount         Int?             @map("file_count")
+  /// Validated, canonical site bundle produced by the worker. Write-once.
+  buildArtifactKey  String?          @map("build_artifact_key") @db.VarChar(512)
+  buildSha256       String?          @map("build_sha256") @db.Char(64)
+  /// Immutable image id (sha256:...) built from the controlled template.
+  imageReference    String?          @map("image_reference") @db.VarChar(255)
+  status            DeploymentStatus @default(DRAFT)
+  /// Base URL of the isolated preview origin (no access token in it).
+  previewUrl        String?          @map("preview_url") @db.VarChar(512)
+  previewExpiresAt  DateTime?        @map("preview_expires_at")
+  /// Set when an authorized user opened the preview; promotion requires it.
+  previewViewedAt   DateTime?        @map("preview_viewed_at")
+  errorCode         String?          @map("error_code") @db.VarChar(64)
+  /// Incident response: quarantined revisions can never be previewed, promoted or rolled back to.
+  quarantinedAt     DateTime?        @map("quarantined_at")
+  /// Heuristic content-scan findings (src/server/uploads/content-scan.ts), written by the worker.
+  contentFindings   Json?            @map("content_findings")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  deployedAt        DateTime?        @map("deployed_at")
+
+  website    Website         @relation("WebsiteDeployments", fields: [websiteId], references: [id], onDelete: Restrict)
+  activeFor  Website?        @relation("ActiveDeployment")
+  uploadedBy User            @relation("DeploymentUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  jobs       DeploymentJob[]
+  logs       DeploymentLog[]
+  auditLogs  AuditLog[]
+
+  @@unique([websiteId, version])
+  @@index([websiteId, status])
+  @@index([status, previewExpiresAt])
+  @@map("deployments")
+}
+
+model DeploymentJob {
+  id                String    @id @default(uuid(7)) @db.Char(36)
+  deploymentId      String    @map("deployment_id") @db.Char(36)
+  websiteId         String    @map("website_id") @db.Char(36)
+  jobType           JobType   @map("job_type")
+  status            JobStatus @default(QUEUED)
+  attempts          Int       @default(0)
+  maxAttempts       Int       @default(3) @map("max_attempts")
+  errorCode         String?   @map("error_code") @db.VarChar(64)
+  /// Equals website_id while a PROMOTE/ROLLBACK job is QUEUED or RUNNING, NULL otherwise.
+  /// The UNIQUE index serializes production changes per website (= per department).
+  activeLockKey     String?   @unique @map("active_lock_key") @db.Char(36)
+  /// Fencing token: rotated on every claim; all worker writes must match it.
+  leaseToken        String?   @map("lease_token") @db.Char(32)
+  leaseOwner        String?   @map("lease_owner") @db.VarChar(100)
+  leaseExpiresAt    DateTime? @map("lease_expires_at")
+  runAfter          DateTime  @default(now()) @map("run_after")
+  /// For ROLLBACK: the deployment that was active when the rollback was requested.
+  fromDeploymentId  String?   @map("from_deployment_id") @db.Char(36)
+  requestedByUserId String    @map("requested_by_user_id") @db.Char(36)
+  startedAt         DateTime? @map("started_at")
+  finishedAt        DateTime? @map("finished_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  deployment  Deployment @relation(fields: [deploymentId], references: [id], onDelete: Restrict)
+  website     Website    @relation(fields: [websiteId], references: [id], onDelete: Restrict)
+  requestedBy User       @relation("JobRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([status, runAfter])
+  @@index([status, leaseExpiresAt])
+  @@index([deploymentId])
+  @@index([websiteId])
+  @@map("deployment_jobs")
+}
+
+/// User-safe progress messages shown in the build log view. Never contains raw tool output.
+model DeploymentLog {
+  id           BigInt   @id @default(autoincrement())
+  deploymentId String   @map("deployment_id") @db.Char(36)
+  level        String   @db.VarChar(10)
+  message      String   @db.VarChar(500)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  deployment Deployment @relation(fields: [deploymentId], references: [id], onDelete: Restrict)
+
+  @@index([deploymentId, id])
+  @@map("deployment_logs")
+}
+
+model AuditLog {
+  id           BigInt   @id @default(autoincrement())
+  actorUserId  String?  @map("actor_user_id") @db.Char(36)
+  /// Account affected by an enrollment/password event (no FK: audit rows outlive every other record).
+  targetUserId String?  @map("target_user_id") @db.Char(36)
+  departmentId String?  @map("department_id") @db.Char(36)
+  websiteId    String?  @map("website_id") @db.Char(36)
+  deploymentId String?  @map("deployment_id") @db.Char(36)
+  action       String   @db.VarChar(64)
+  /// SUCCESS | DENIED | FAILURE
+  result       String   @default("SUCCESS") @db.VarChar(16)
+  /// Correlates all events of one HTTP request / worker job.
+  requestId    String?  @map("request_id") @db.VarChar(64)
+  /// Truncated SHA-256 of the client IP (no raw IPs stored).
+  sourceIpHash String?  @map("source_ip_hash") @db.Char(16)
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actor      User?       @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  website    Website?    @relation(fields: [websiteId], references: [id], onDelete: Restrict)
+  deployment Deployment? @relation(fields: [deploymentId], references: [id], onDelete: Restrict)
+
+  @@index([departmentId, createdAt])
+  @@index([websiteId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([targetUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([requestId])
+  @@map("audit_logs")
+}
+
+model Session {
+  /// SHA-256 of the opaque session token held in the cookie.
+  id              String       @id @db.Char(64)
+  userId          String       @map("user_id") @db.Char(36)
+  csrfToken       String       @map("csrf_token") @db.VarChar(64)
+  /// FULL, or PASSWORD_CHANGE (may only change the password / sign out).
+  stage           SessionStage @default(FULL)
+  /// Last successful password verification — used for re-authentication of sensitive actions.
+  authenticatedAt DateTime     @default(now()) @map("authenticated_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  lastSeenAt      DateTime     @default(now()) @map("last_seen_at")
+  expiresAt       DateTime     @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+enum SessionStage {
+  FULL
+  PASSWORD_CHANGE
+}
+
+model IdempotencyKey {
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  userId         String   @map("user_id") @db.Char(36)
+  scope          String   @db.VarChar(100)
+  key            String   @db.VarChar(128)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at")
+  expiresAt      DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model RateLimit {
+  key         String   @db.VarChar(191)
+  windowStart DateTime @map("window_start")
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limits")
+}

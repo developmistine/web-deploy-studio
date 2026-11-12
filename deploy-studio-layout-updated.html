@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Deploy Studio</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:light;--bg:#f6f6f6;--surface:#fff;--text:#171717;--muted:#777;--line:#e7e7e7;--soft:#f3f3f3;--sketch:#989898;--accent:#e73596;--shadow:0 12px 48px #1111110a}
+:root[data-theme=dark]{color-scheme:dark;--bg:#080808;--surface:#171717;--text:#f5f5f5;--muted:#a1a1a1;--line:#383838;--soft:#252525;--sketch:#999;--shadow:0 12px 48px #0006}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);transition:background .18s,color .18s}button{font:inherit;cursor:pointer}button:disabled{cursor:not-allowed;opacity:.52}.shell{max-width:1160px;margin:0 auto;padding:24px 22px 64px}.topbar{min-height:62px;display:flex;align-items:center;justify-content:space-between;position:relative;margin-bottom:26px}.brand{font-size:21px;font-weight:650;letter-spacing:-.5px;display:flex;align-items:center;gap:10px}.brand svg{width:26px;height:26px}.logo{position:absolute;left:50%;transform:translateX(-50%);height:45px;width:auto;max-width:130px;object-fit:contain;mix-blend-mode:multiply}:root[data-theme=dark] .logo{mix-blend-mode:normal;background:#fff;border-radius:4px;padding:2px 6px}.theme-switch{display:flex;align-items:center;gap:9px}.theme-switch svg{width:20px;height:20px}.sketch{position:relative;border:1px solid var(--line);background:transparent;border-radius:17px;transition:background .16s,color .16s,transform .15s;isolation:isolate}.sketch:before{content:'';position:absolute;inset:-4px;pointer-events:none;border:1.4px solid var(--sketch);border-radius:18px 15px 20px 17px;transform:rotate(-.6deg);opacity:.74}.sketch:after{content:'';position:absolute;inset:-2px;pointer-events:none;border:1px dashed var(--sketch);border-radius:16px 19px 15px 20px;transform:rotate(.4deg);opacity:.32}.sketch:hover:not(:disabled){background:var(--soft);transform:translateY(-1px)}.sketch:focus-visible,.dropzone:focus-visible{outline:2px solid var(--accent);outline-offset:5px}.theme-button{padding:9px 20px;color:var(--text);font-weight:600}.panel{background:var(--surface);border-radius:25px;padding:22px;box-shadow:var(--shadow);border:1px solid var(--line)}.dropzone{width:100%;min-height:260px;border:1.5px dashed var(--line);border-radius:18px;display:flex;align-items:center;justify-content:center;text-align:center;padding:38px 20px;position:relative;outline:none;transition:background .15s,border-color .15s}.dropzone:before{content:'';position:absolute;inset:5px;pointer-events:none;border:1px dashed var(--sketch);border-radius:20px 17px 19px 15px;opacity:.32;transform:rotate(-.15deg)}.dropzone.dragover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,transparent)}.upload-icon{width:36px;height:36px;stroke:var(--muted);margin-bottom:12px}.dropzone h1{margin:0 0 10px;font-size:23px;letter-spacing:-.6px;font-weight:650}.hint{margin:0 0 24px;color:var(--muted);font-size:15px}.browse{padding:9px 21px;color:var(--text);font-weight:600}.file-summary{padding:25px 1px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;color:var(--muted);font-size:14px;min-height:68px}.file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.status{border-radius:99px;padding:6px 12px;background:var(--soft);color:var(--text);font-weight:600;font-size:13px;flex-shrink:0}.status.ready{background:#dcfce7;color:#146c3a}.status.error{background:#fee2e2;color:#991b1b}.primary{border:0;background:var(--text);color:var(--surface);width:100%;min-height:54px;border-radius:16px;font-weight:650;font-size:16px;display:flex;align-items:center;justify-content:center;gap:10px;transition:opacity .15s,transform .15s}.primary:hover:not(:disabled){transform:translateY(-1px);opacity:.87}.primary svg{width:21px;height:21px}.preview-pane{display:none;margin-top:22px;border-top:1px solid var(--line);padding-top:22px}.preview-pane.visible{display:block}.preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}.preview-head h2{margin:0;font-size:16px}.preview-actions{display:flex;gap:12px;align-items:center}.mini{padding:8px 14px;color:var(--text);font-size:13px}.browser{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#fff}.browser-bar{height:42px;border-bottom:1px solid #e7e7e7;display:flex;align-items:center;gap:7px;padding:0 14px;background:#fafafa}.dot{width:9px;height:9px;border-radius:50%;background:#d5d5d5}.browser-url{margin-left:13px;background:#ededed;border-radius:6px;color:#777;padding:5px 12px;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.browser iframe{width:100%;height:75vh;min-height:650px;max-height:1100px;border:0;background:#fff;display:block}.deploy-row{display:flex;justify-content:flex-end;align-items:center;gap:18px;margin-top:19px;flex-wrap:wrap}.deploy-row .primary{width:auto;padding:0 25px;background:var(--accent);color:#fff}.deploy-row p{margin:0;color:var(--muted);font-size:13px}.message{color:#ac3945;font-size:13px;min-height:22px;margin:9px 2px 0}.footnote{text-align:center;color:var(--muted);font-size:12px;margin-top:18px}@media(max-width:650px){.shell{padding:14px 12px}.brand span{font-size:0}.brand svg{width:27px}.topbar{margin-bottom:12px}.logo{height:34px;max-width:95px}.theme-button{padding:8px 12px}.panel{padding:13px;border-radius:17px}.dropzone{min-height:250px}.dropzone h1{font-size:20px}.hint{font-size:13px}.deploy-row{align-items:stretch;flex-direction:column}.deploy-row .primary{width:100%}}
+
+/* Deployment workspace */
+.navline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-5px 0 20px;flex-wrap:wrap}.tabs,.controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.tab{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:11px;padding:10px 16px;font-size:14px;font-weight:650}.tab.active{color:var(--text);background:var(--surface);border-color:var(--sketch)}.switch-label{font-size:12px;color:var(--muted)}.select-ui,.text-ui{min-height:42px;border:1px solid var(--line);border-radius:11px;padding:9px 12px;background:var(--surface);color:var(--text);font:inherit}.select-ui:focus,.text-ui:focus{outline:2px solid var(--accent);outline-offset:2px}.workspace{display:none}.workspace.active{display:block}.domain-settings{margin:0 0 22px;padding:0 0 20px;border-bottom:1px solid var(--line)}.section-head{font-size:16px;font-weight:700;margin:0 0 5px}.subtle{font-size:13px;color:var(--muted);margin:0 0 16px}.domain-grid{display:grid;grid-template-columns:160px minmax(0,1fr);gap:14px}.field{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:650}.domain-address{margin-top:13px;padding:12px 14px;background:var(--soft);border:1px solid var(--line);border-radius:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:14px}.domain-address code{overflow-wrap:anywhere;color:var(--accent);font-weight:700}.notice{margin-top:10px;color:var(--muted);font-size:12px}.notice.error{color:#be3452}.deployment-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.deployment-header h2{margin:0;font-size:22px}.filterline{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 15px}.filter{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:12px;padding:8px 14px;font-size:13px;cursor:pointer}.filter.active{background:var(--text);color:var(--surface)}.records{display:grid;gap:11px}.record{border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.record-body{min-width:0;flex:1}.record-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:15px;font-weight:700}.record-domain{color:var(--accent);word-break:break-word}.meta{font-size:12px;color:var(--muted);margin-top:7px}.record-actions{display:flex;align-items:center;gap:9px}.pill{padding:4px 9px;border-radius:99px;font-size:11px;background:var(--soft);font-weight:700}.delete{color:#bf365e;border:1px solid #b65c794a;background:transparent;border-radius:10px;padding:9px 13px;font-weight:650}.empty{padding:65px 10px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:14px}.preview-link{font-size:13px;color:var(--accent);font-weight:700}.demo-note{font-size:12px;color:var(--muted);margin:12px 2px 0}.signed-in-name{color:var(--text);font-size:14px;font-weight:650;padding:9px 13px;border-radius:11px;border:1px solid var(--line);background:var(--surface)}
+@media(max-width:650px){.domain-grid{grid-template-columns:1fr}.navline{align-items:flex-start}.controls{width:100%}.select-ui{flex:1}.tab{padding:9px 12px}.record{align-items:stretch}.record-actions{justify-content:flex-end}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="topbar">
+  <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9 8 4h8l5 5v2H3zM4 15h16M6 19h12"/></svg><span>Deploy Studio</span></div>
+  <img class="logo" alt="BW logo" src="data:image/png;base64,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" />
+  <div class="theme-switch"><svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg><button class="sketch theme-button" id="theme-btn" aria-label="Toggle color theme">Dark</button></div>
+</header>
+
+<div class="navline" aria-label="Workspace navigation">
+  <div class="tabs" role="tablist"><button class="tab active" id="tab-upload" role="tab" aria-selected="true">+ New deploy</button><button class="tab" id="tab-list" role="tab" aria-selected="false">My deployments <span id="my-count"></span></button></div>
+  <div class="controls"><span class="signed-in-name" id="signed-in-name" aria-label="Signed in user">Chana</span></div>
+</div>
+<main class="panel workspace active" id="upload-workspace">
+  <section class="domain-settings" aria-label="Deployment destination">
+    <div class="domain-grid"><label class="field">Department<select id="department" class="select-ui"><option value="dtd">DTD</option><option value="erp">ERP</option><option value="ka">KA</option></select></label><label class="field">Site name<input id="site-name" class="text-ui" value="my-dashboard" maxlength="48" spellcheck="false" placeholder="e.g. sales-dashboard" autocomplete="off" /></label></div>
+    <div class="domain-address"><span>Requested hostname <span class="switch-label">(demo)</span></span><code id="hostname">dtd.my-dashboard</code></div>
+    <p class="notice" id="domain-notice">ชื่อโดเมนเป็นตัวอย่าง ต้องกำหนด DNS และ hosting จริงก่อนใช้งานได้</p>
+  </section>
+  <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Upload website files">
+    <div>
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17a5 5 0 0 1-1-9.7A7 7 0 0 1 18.4 9 4 4 0 0 1 19 17"/><path d="m8 15 4-4 4 4M12 11v10"/></svg>
+      <h1>Drop your project here</h1>
+      <p class="hint">Upload .zip, .html, .css, .js หรือ assets</p>
+      <button id="browse" type="button" class="sketch browse">Browse files</button>
+      <input type="file" id="files" multiple accept=".zip,.html,.htm,.css,.js,.json,.png,.jpg,.jpeg,.gif,.svg,.webp,.ico,.woff,.woff2,.ttf" hidden />
+    </div>
+  </div>
+  <div class="file-summary"><span id="file-name" class="file-name">No file selected</span><span id="status" class="status">Waiting</span></div>
+
+  <button id="preview-btn" class="primary" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>
+  <p id="message" class="message" role="alert"></p>
+  <section id="preview-pane" class="preview-pane" aria-label="Website preview">
+    <div class="preview-head"><h2>Preview ready</h2><div class="preview-actions"><button class="sketch mini" id="reset-btn">Change files</button><button class="sketch mini" id="refresh-btn">Refresh preview</button></div></div>
+    <div class="browser"><div class="browser-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="browser-url">Local sandbox preview</span></div><iframe id="preview-frame" title="Website preview" sandbox="allow-scripts"></iframe></div>
+    <div class="deploy-row"><p>Preview ใช้ทดสอบภายในเบราว์เซอร์เท่านั้น · Deploy บันทึกรายการจำลอง</p><button id="deploy-btn" class="primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m12 3 7 8-7 2-2 7-3-8-4-2 9-7Z"/></svg>Deploy to Production</button></div>
+  </section>
+</main>
+<section class="panel workspace" id="list-workspace" aria-label="Deployment history">
+  <div class="deployment-header"><div><h2 id="list-title">My deployments</h2><p class="subtle" id="list-desc">รายการที่อัปโหลดด้วยบัญชีปัจจุบัน</p></div><span class="status" id="list-count">0 sites</span></div>
+  <div class="filterline" id="team-filters" aria-label="Department filters"></div>
+  <div class="records" id="records"></div>
+  <p class="demo-note">รายการเก็บใน LocalStorage เพื่อสาธิต UI เท่านั้น ชื่อผู้ใช้และสิทธิ์เป็น session จำลอง ต้องเชื่อมระบบล็อกอินบริษัทและตรวจสิทธิ์ที่ Backend ก่อนใช้งานจริง</p>
+</section>
+<p class="footnote">Static website preview · Light / Dark · Drag & Drop</p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const root = document.documentElement;
+  let theme = localStorage.getItem('deploy-studio-theme') || 'light';
+  let chosen = [];
+  let currentHTML = '';
+  function setTheme(next) {theme=next;root.dataset.theme=next;localStorage.setItem('deploy-studio-theme',next);$('theme-btn').textContent=next==='dark'?'Light':'Dark'}
+  setTheme(theme);
+  $('theme-btn').onclick=()=>setTheme(theme==='dark'?'light':'dark');
+  const setStatus=(t,cls='')=>{$('status').textContent=t;$('status').className='status '+cls};
+  function choose(files){
+    chosen=Array.from(files).filter(f=>f && f.size>=0);
+    currentHTML='';$('preview-pane').classList.remove('visible');$('preview-frame').removeAttribute('srcdoc');$('message').textContent='';
+    $('file-name').textContent=chosen.length===0?'No file selected':chosen.length===1?chosen[0].name:`${chosen.length} files selected`;
+    setStatus(chosen.length?'Selected':'Waiting');$('preview-btn').disabled=!chosen.length;
+  }
+  $('browse').onclick=(e)=>{e.stopPropagation();$('files').click()};
+  $('dropzone').onclick=(e)=>{if(e.target.closest('button'))return;$('files').click()};
+  $('dropzone').onkeydown=e=>{if(e.target===$('dropzone')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();$('files').click()}};
+  $('files').onchange=e=>choose(e.target.files);
+  const dz=$('dropzone');
+  ['dragenter','dragover'].forEach(name=>dz.addEventListener(name,e=>{e.preventDefault();dz.classList.add('dragover')}));
+  ['dragleave','drop'].forEach(name=>dz.addEventListener(name,e=>{e.preventDefault();dz.classList.remove('dragover')}));
+  dz.addEventListener('drop',e=>{if(e.dataTransfer?.files?.length)choose(e.dataTransfer.files)});
+  function safePath(s){return s.replaceAll('\\','/').replace(/^\.\//,'').replace(/^\//,'')}
+  function escRegExp(x){return x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
+  async function buildPreview(){
+    let entries=new Map();
+    const zip=chosen.find(f=>/\.zip$/i.test(f.name));
+    if(zip){
+      if(typeof JSZip==='undefined')throw Error('โหลดตัวอ่าน ZIP ไม่สำเร็จ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+      const archive=await JSZip.loadAsync(zip);
+      const names=Object.keys(archive.files).filter(k=>!archive.files[k].dir&&!k.startsWith('__MACOSX/')&&!k.split('/').some(x=>x==='..'));
+      if(names.length>400)throw Error('ZIP มีไฟล์มากเกินไปสำหรับ Preview ตัวอย่างนี้');
+      for(const k of names){const entry=archive.files[k];const blob=await entry.async('blob');entries.set(safePath(k),new File([blob],k,{type:guessMime(k)}))}
+    }else{for(const f of chosen)entries.set(safePath(f.webkitRelativePath||f.name),f)}
+    const index=[...entries.keys()].find(k=>/^(index\.html?|[^/]+\/index\.html?)$/i.test(k))||[...entries.keys()].find(k=>/\.html?$/i.test(k));
+    if(!index)throw Error('ไม่พบไฟล์ HTML กรุณาเพิ่ม index.html หรืออัปโหลด ZIP ที่มี index.html');
+    const base=index.includes('/')?index.slice(0,index.lastIndexOf('/')+1):'';
+    let html=await entries.get(index).text();
+    // Rewrite quoted local asset paths into data URLs for an isolated srcdoc preview.
+    for(const [name,file] of entries){
+      if(name===index)continue;
+      const path=name.startsWith(base)?name.slice(base.length):name;
+      if(!path||path.includes('../')||file.size>8*1024*1024)continue;
+      const url=await fileToDataURL(file);
+      const variants=[path,'./'+path,'/'+path];
+      for(const v of variants){
+        const safe=escRegExp(v);
+        // Replace only exact quoted attribute / CSS URL references, not arbitrary source text.
+        html=html.replace(new RegExp('(["\\\'])'+safe+'\\1','g'),(_m,q)=>q+url+q);
+      }
+    }
+    return html;
+  }
+  function guessMime(name){const ext=name.split('.').pop().toLowerCase();return ({html:'text/html',htm:'text/html',css:'text/css',js:'text/javascript',json:'application/json',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',svg:'image/svg+xml',webp:'image/webp',ico:'image/x-icon',woff:'font/woff',woff2:'font/woff2'})[ext]||'application/octet-stream'}
+  function fileToDataURL(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('อ่าน asset ไม่สำเร็จ'));r.readAsDataURL(file)})}
+  $('preview-btn').onclick=async()=>{
+    $('preview-btn').disabled=true;setStatus('Preparing');$('message').textContent='';
+    try{currentHTML=await buildPreview();$('preview-frame').srcdoc=currentHTML;$('preview-pane').classList.add('visible');setStatus('Preview ready','ready');$('preview-pane').scrollIntoView({behavior:'smooth',block:'nearest'})}
+    catch(err){setStatus('Error','error');$('message').textContent=err.message||'ไม่สามารถ Preview ได้'}
+    finally{$('preview-btn').disabled=!chosen.length}
+  };
+  $('refresh-btn').onclick=()=>{if(currentHTML)$('preview-frame').srcdoc=currentHTML};
+  $('reset-btn').onclick=()=>{$('files').value='';choose([])};
+  $('deploy-btn').onclick=()=>alert('Preview พร้อมแล้ว! การ Deploy ขึ้น Production ต้องเชื่อม Backend, storage และ hosting API ก่อน — ปุ่มนี้ยังไม่เผยแพร่เว็บไซต์จริง');
+
+  // Mock session for this static prototype. Replace with verified corporate SSO session from server.
+  const session={userId:'chana',name:'Chana',department:'ka',role:'admin'};
+  $('signed-in-name').textContent=session.name;
+  const accounts={alice:{label:'Alice',department:'dtd'},bob:{label:'Bob',department:'erp'},chana:{label:'Chana',department:'ka'}};
+  let activeTab='upload',filter='all';
+  const key='deploy-studio-records-v1';
+  const getRecords=()=>{try{const data=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(data)?data:[]}catch{return []}};
+  const saveRecords=items=>localStorage.setItem(key,JSON.stringify(items));
+  const slugValue=()=> $('site-name').value.trim().toLowerCase();
+  const validSlug=slug=>/^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/.test(slug);
+  function updateHostname(){
+    const slug=slugValue(),dept=$('department').value;
+    $('hostname').textContent=dept+'.'+(slug||'site-name');
+    const valid=validSlug(slug);
+    $('domain-notice').textContent=valid?'ชื่อโดเมนเป็นตัวอย่าง ต้องกำหนด DNS และ hosting จริงก่อนใช้งานได้':'ใช้ตัวอักษร a-z, ตัวเลข 0-9 และขีดกลาง (-) เท่านั้น ห้ามขึ้นต้นหรือลงท้ายด้วย -';
+    $('domain-notice').className='notice'+(valid?'':' error');
+    $('deploy-btn').disabled=!valid;
+    return valid;
+  }
+  $('site-name').addEventListener('input',updateHostname);$('department').addEventListener('change',updateHostname);
+  updateHostname();
+  function showTab(tab){
+    activeTab=tab;
+    for(const name of ['upload','list']){$('tab-'+name).classList.toggle('active',name===tab);$('tab-'+name).setAttribute('aria-selected',String(name===tab));$(''+name+'-workspace').classList.toggle('active',name===tab)}
+    if(tab==='list')renderList();
+  }
+  $('tab-upload').onclick=()=>showTab('upload');$('tab-list').onclick=()=>showTab('list');
+  function updateRole(){
+    const isAdmin=session.role==='admin';
+    $('department').disabled=!isAdmin;
+    if(!isAdmin){$('department').value=accounts[session.userId].department;updateHostname();}
+    $('tab-list').firstChild.textContent=isAdmin?'All deployments ':'My deployments ';
+    if(!isAdmin)filter='all';
+    renderList();
+  }
+  function renderList(){
+    const all=getRecords(),isAdmin=session.role==='admin',who=session.userId;
+    const allowed=isAdmin?all:all.filter(x=>x.owner===who);
+    const visible=allowed.filter(x=>filter==='all'||x.department===filter);
+    $('list-title').textContent=isAdmin?'All deployments':'My deployments';
+    $('list-desc').textContent=isAdmin?'Admin เห็นและลบ Deployment ของทุกฝ่ายได้':'User เห็นและลบเฉพาะรายการที่ตนเองอัปโหลด';
+    $('my-count').textContent='('+allowed.length+')';
+    $('list-count').textContent=visible.length+' sites';
+    const tabs=isAdmin?['all','dtd','erp','ka']:['all'];
+    $('team-filters').replaceChildren();
+    for(const t of tabs){const btn=document.createElement('button');btn.className='filter'+(filter===t?' active':'');btn.textContent=t==='all'?'All teams':t.toUpperCase();btn.onclick=()=>{filter=t;renderList()};$('team-filters').append(btn)}
+    $('records').replaceChildren();
+    if(!visible.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='ยังไม่มี Deployment ในรายการนี้';$('records').append(empty);return}
+    for(const item of visible.slice().reverse()){
+      const row=document.createElement('article');row.className='record';
+      const body=document.createElement('div');body.className='record-body';
+      const title=document.createElement('div');title.className='record-title';
+      const hostname=document.createElement('span');hostname.className='record-domain';hostname.textContent=item.hostname;
+      const pill=document.createElement('span');pill.className='pill';pill.textContent=item.department.toUpperCase();title.append(hostname,pill);
+      const meta=document.createElement('div');meta.className='meta';meta.textContent='Owner: '+(accounts[item.owner]?.label||item.owner)+' · '+new Date(item.time).toLocaleString('th-TH')+' · '+item.filename;
+      body.append(title,meta);
+      const actions=document.createElement('div');actions.className='record-actions';
+      const status=document.createElement('span');status.className='pill';status.textContent='Demo deploy';
+      const del=document.createElement('button');del.className='delete';del.textContent='Delete';del.setAttribute('aria-label','Delete '+item.hostname);
+      del.onclick=()=>{
+        if(!isAdmin&&item.owner!==session.userId){alert('ไม่มีสิทธิ์ลบรายการนี้');return}
+        if(!confirm('ลบ Deployment จำลอง '+item.hostname+' ?'))return;
+        saveRecords(getRecords().filter(x=>x.id!==item.id));renderList();
+      };
+      actions.append(status,del);row.append(body,actions);$('records').append(row);
+    }
+  }
+  $('deploy-btn').onclick=()=>{
+    if(!currentHTML){alert('กรุณากด Preview ก่อน');return}
+    if(!updateHostname())return;
+    const dept=$('department').value,slug=slugValue(),hostname=dept+'.'+slug;
+    const records=getRecords();
+    if(records.some(r=>r.hostname===hostname)){alert('ชื่อ '+hostname+' ถูกใช้แล้ว กรุณาเปลี่ยนชื่อเว็บไซต์');return}
+    const owner=session.userId;
+    // A simulated deploy: no upload, DNS provisioning or public hosting happens.
+    records.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2,7),owner,department:dept,slug,hostname,filename:chosen.map(f=>f.name).join(', ').slice(0,160),time:new Date().toISOString()});
+    saveRecords(records);
+    alert('บันทึก Deployment จำลอง: '+hostname+'\nยังไม่มีเว็บไซต์ออนไลน์หรือโดเมนจริง');
+    filter='all';showTab('list');
+  };
+  $('department').value=accounts[session.userId].department;updateHostname();updateRole();
+})();
+</script>
+</body></html>

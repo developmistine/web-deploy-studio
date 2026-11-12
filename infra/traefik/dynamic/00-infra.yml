@@ -1,0 +1,52 @@
+# Infrastructure-owned dynamic config (read-only). Site/preview routers are written by the worker and
+# ALWAYS reference `ds-gateway@file` — there is no unauthenticated route to hosted content.
+http:
+  middlewares:
+    # Private website gateway: every request to a site/preview origin is authorized by Deploy Studio.
+    ds-gateway:
+      forwardAuth:
+        address: '{{ env "GATEWAY_AUTH_URL" }}'
+        trustForwardHeader: false
+        # Only these client headers reach the gate (X-Forwarded-* are set by Traefik itself).
+        authRequestHeaders:
+          - Cookie
+          - X-DS-Probe
+          - X-Request-Id
+
+    ds-site-headers:
+      headers:
+        customResponseHeaders:
+          Server: ""
+          X-Powered-By: ""
+
+    studio-headers:
+      headers:
+        customResponseHeaders:
+          Server: ""
+
+    upload-limit:
+      buffering:
+        maxRequestBodyBytes: 55000000   # UPLOAD_MAX_ARCHIVE_MB + multipart overhead
+
+  routers:
+    # Management app. /api/internal/* (forward-auth gate) is never reachable from outside.
+    studio:
+      rule: 'Host(`{{ env "STUDIO_HOST" }}`) && !PathPrefix(`/api/internal`)'
+      entryPoints: [web]
+      service: studio
+      middlewares: [studio-headers]
+
+    # Request-body limit only where bodies are large (uploads). Traefik's buffering middleware also buffers
+    # responses and fails on empty-body responses (e.g. 303 redirects), so it must not wrap other routes.
+    studio-upload:
+      rule: 'Host(`{{ env "STUDIO_HOST" }}`) && Method(`POST`) && PathRegexp(`^/api/v1/websites/[0-9a-f-]{36}/deployments$`)'
+      entryPoints: [web]
+      service: studio
+      middlewares: [studio-headers, upload-limit]
+
+  services:
+    studio:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: '{{ env "STUDIO_UPSTREAM" }}'
